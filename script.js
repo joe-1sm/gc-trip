@@ -363,14 +363,20 @@ async function loadWeatherForDay(day) {
         const today = new Date();
         const daysUntilTrip = Math.ceil((tripDate - today) / (1000 * 60 * 60 * 24));
 
+        // If the date is more than 7 days out, show historical averages instead
+        if (daysUntilTrip > 7) {
+            await showHistoricalWeather(day, widget);
+            return;
+        }
+
         // Open-Meteo API (free, no key required)
         const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max,weather_code&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=America/Denver`;
 
         const response = await fetch(url);
         const data = await response.json();
 
-        // Find the right day in the forecast (max 16 days out)
-        let dayIndex = Math.min(daysUntilTrip, 15);
+        // Find the right day in the forecast
+        let dayIndex = daysUntilTrip;
         if (dayIndex < 0) dayIndex = 0;
 
         const temp_max = Math.round(data.daily.temperature_2m_max[dayIndex]);
@@ -385,7 +391,7 @@ async function loadWeatherForDay(day) {
         widget.innerHTML = `
             <div class="weather-header">
                 <div>
-                    <div style="font-size: 1.1rem; margin-bottom: 0.5rem;">${day.location} Weather</div>
+                    <div style="font-size: 1.1rem; margin-bottom: 0.5rem;">${day.location} Weather Forecast</div>
                     <div style="font-size: 0.9rem; opacity: 0.9;">${weatherDesc}</div>
                 </div>
                 <div class="weather-icon">${weatherIcon}</div>
@@ -405,7 +411,7 @@ async function loadWeatherForDay(day) {
                 </div>
                 <div class="weather-detail">
                     <span class="weather-detail-label">Forecast</span>
-                    <span class="weather-detail-value">${daysUntilTrip > 15 ? 'Long-term' : `${daysUntilTrip}d out`}</span>
+                    <span class="weather-detail-value">${daysUntilTrip}d out</span>
                 </div>
             </div>
         `;
@@ -421,6 +427,80 @@ async function loadWeatherForDay(day) {
             </div>
             <div style="opacity: 0.8; margin-top: 1rem;">
                 Check weather closer to your trip date for accurate forecasts.
+            </div>
+        `;
+    }
+}
+
+// Show historical weather data for dates beyond the 7-day forecast
+async function showHistoricalWeather(day, widget) {
+    try {
+        const { lat, lon } = day.coordinates;
+        const tripDate = new Date(day.date);
+
+        // Get the same date from 2024 for historical reference
+        const historicalDate = new Date(tripDate);
+        historicalDate.setFullYear(2024);
+        const formattedDate = historicalDate.toISOString().split('T')[0];
+
+        // Fetch historical weather data
+        const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}&start_date=${formattedDate}&end_date=${formattedDate}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=America/Denver`;
+
+        const response = await fetch(url);
+        const data = await response.json();
+
+        const temp_max = Math.round(data.daily.temperature_2m_max[0]);
+        const temp_min = Math.round(data.daily.temperature_2m_min[0]);
+        const precipitation = Math.round(data.daily.precipitation_sum[0] * 100) / 100;
+        const windSpeed = Math.round(data.daily.wind_speed_10m_max[0]);
+
+        widget.innerHTML = `
+            <div class="weather-header">
+                <div>
+                    <div style="font-size: 1.1rem; margin-bottom: 0.5rem;">${day.location} - Typical Weather</div>
+                    <div style="font-size: 0.9rem; opacity: 0.9;">Historical data from Oct ${tripDate.getDate()}, 2024</div>
+                </div>
+                <div class="weather-icon">📊</div>
+            </div>
+            <div style="display: flex; gap: 2rem; align-items: center;">
+                <div class="weather-temp">${temp_max}°F</div>
+                <div style="font-size: 1.2rem; opacity: 0.9;">Low: ${temp_min}°F</div>
+            </div>
+            <div class="weather-details">
+                <div class="weather-detail">
+                    <span class="weather-detail-label">Precipitation</span>
+                    <span class="weather-detail-value">${precipitation}"</span>
+                </div>
+                <div class="weather-detail">
+                    <span class="weather-detail-label">Wind</span>
+                    <span class="weather-detail-value">${windSpeed} mph</span>
+                </div>
+                <div class="weather-detail">
+                    <span class="weather-detail-label">Status</span>
+                    <span class="weather-detail-value">Historical</span>
+                </div>
+            </div>
+            <div style="margin-top: 1rem; padding: 0.75rem; background: rgba(255,255,255,0.2); border-radius: 6px; font-size: 0.85rem;">
+                ℹ️ Live forecast available 7 days before your trip
+            </div>
+        `;
+    } catch (error) {
+        console.error('Historical weather fetch error:', error);
+        widget.innerHTML = `
+            <div class="weather-header">
+                <div>
+                    <div style="font-size: 1.1rem; margin-bottom: 0.5rem;">${day.location} Weather</div>
+                    <div style="font-size: 0.9rem; opacity: 0.9;">Typical October conditions</div>
+                </div>
+                <div class="weather-icon">🌤️</div>
+            </div>
+            <div style="opacity: 0.8; margin-top: 1rem; line-height: 1.6;">
+                <strong>Expected conditions for mid-October:</strong><br>
+                • Grand Canyon: 60-70°F days, 30-40°F nights<br>
+                • Amangiri/Lake Powell: 70-80°F days, 40-50°F nights<br>
+                • Bryce Canyon: 50-60°F days, 25-35°F nights<br>
+                <br>
+                Live forecast will be available 7 days before your trip.
             </div>
         `;
     }
