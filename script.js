@@ -11,6 +11,7 @@ const tripData = [
         coordinates: { lat: 36.0544, lon: -112.1401 },
         driveTime: "4.5 hours",
         driveFrom: "Las Vegas",
+        driveFromCoords: { lat: 36.1699, lon: -115.1398 },
         activities: [
             { name: "South Rim Sunset", icon: "🌅", description: "Catch the breathtaking sunset at Mather Point or Yavapai Point" },
             { name: "Desert View Watchtower", icon: "🗼", description: "Visit this historic 70-foot stone tower with panoramic views" },
@@ -28,6 +29,7 @@ const tripData = [
         coordinates: { lat: 37.0336, lon: -111.9841 },
         driveTime: "3 hours",
         driveFrom: "Grand Canyon",
+        driveFromCoords: { lat: 36.0544, lon: -112.1401 },
         activities: [
             { name: "Sunrise at Grand Canyon", icon: "🌄", description: "Wake up early for an unforgettable sunrise over the canyon" },
             { name: "Amangiri Spa", icon: "💆", description: "Relax with world-class spa treatments in the desert" },
@@ -61,6 +63,7 @@ const tripData = [
         coordinates: { lat: 37.6283, lon: -112.1676 },
         driveTime: "2.5 hours",
         driveFrom: "Amangiri",
+        driveFromCoords: { lat: 37.0336, lon: -111.9841 },
         activities: [
             { name: "Scenic Drive", icon: "🚗", description: "Beautiful drive through Utah's red rock country" },
             { name: "Sunset Point", icon: "🌇", description: "Watch the hoodoos glow at golden hour" },
@@ -94,6 +97,7 @@ const tripData = [
         coordinates: { lat: 37.0336, lon: -111.4803 },
         driveTime: "2 hours",
         driveFrom: "Bryce Canyon",
+        driveFromCoords: { lat: 37.6283, lon: -112.1676 },
         activities: [
             { name: "Morning at Bryce", icon: "🌄", description: "Sunrise hike before departing" },
             { name: "Scenic Highway 12", icon: "🛣️", description: "One of America's most scenic drives" },
@@ -269,13 +273,18 @@ function createDayCard(day) {
     if (day.driveTime) {
         const driveTime = document.createElement('div');
         driveTime.className = 'drive-time';
+        driveTime.style.cursor = 'pointer';
         driveTime.innerHTML = `
             <div class="drive-time-icon">🚗</div>
             <div class="drive-time-info">
                 <div class="drive-time-label">Drive from ${day.driveFrom}</div>
                 <div class="drive-time-duration">${day.driveTime}</div>
             </div>
+            <div style="font-size: 0.9rem; opacity: 0.9;">👆 Click to view route</div>
         `;
+        driveTime.addEventListener('click', () => {
+            openMapModal(day);
+        });
         content.appendChild(driveTime);
     }
 
@@ -577,4 +586,76 @@ function getWeatherDescription(code) {
         99: 'Severe thunderstorm'
     };
     return descriptions[code] || 'Partly cloudy';
+}
+
+// Open map modal with route
+function openMapModal(day) {
+    if (!day.driveFromCoords) return;
+
+    const modal = document.createElement('div');
+    modal.className = 'map-modal';
+    modal.id = 'mapModal';
+
+    const origin = `${day.driveFromCoords.lat},${day.driveFromCoords.lon}`;
+    const destination = `${day.coordinates.lat},${day.coordinates.lon}`;
+
+    // Google Maps Embed URL for directions
+    const embedUrl = `https://www.google.com/maps/embed/v1/directions?key=AIzaSyBFw0Qbyq9zTFTd-tuzjaj08dueUeBDHsA&origin=${origin}&destination=${destination}&mode=driving`;
+
+    // Google Maps URL to open in app/browser
+    const mapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=driving`;
+
+    modal.innerHTML = `
+        <div class="map-modal-content">
+            <div class="map-modal-header">
+                <h2>🗺️ Route: ${day.driveFrom} → ${day.location}</h2>
+                <button class="map-modal-close" onclick="closeMapModal()">&times;</button>
+            </div>
+            <div class="map-modal-body">
+                <iframe
+                    width="100%"
+                    height="450"
+                    style="border:0"
+                    loading="lazy"
+                    allowfullscreen
+                    referrerpolicy="no-referrer-when-downgrade"
+                    src="${embedUrl}">
+                </iframe>
+            </div>
+            <div class="map-modal-footer">
+                <button class="open-in-maps-btn" onclick="window.open('${mapsUrl}', '_blank')">
+                    📍 Open in Google Maps
+                </button>
+                <button class="close-modal-btn" onclick="closeMapModal()">Close</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Close on background click
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            closeMapModal();
+        }
+    });
+
+    // Close on escape key
+    document.addEventListener('keydown', handleEscapeKey);
+}
+
+// Close map modal
+function closeMapModal() {
+    const modal = document.getElementById('mapModal');
+    if (modal) {
+        modal.remove();
+        document.removeEventListener('keydown', handleEscapeKey);
+    }
+}
+
+// Handle escape key to close modal
+function handleEscapeKey(e) {
+    if (e.key === 'Escape') {
+        closeMapModal();
+    }
 }
